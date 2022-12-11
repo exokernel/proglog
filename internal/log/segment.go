@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 
+	api "github.com/exokernel/proglog/api/v1"
 	"google.golang.org/protobuf/proto"
 )
 
