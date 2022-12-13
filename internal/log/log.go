@@ -3,9 +3,12 @@ package log
 import (
 	"io/ioutil"
 	"path"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
+
+	api "github.com/exokernel/proglog/api/v1"
 )
 
 type Log struct {
@@ -34,7 +37,7 @@ func newLog(dir string, c Config) (*Log, error) {
 	return l, l.setup()
 }
 
-func (*Log) setup() error {
+func (l *Log) setup() error {
 	files, err := ioutil.ReadAll(l.Dir)
 	if err != nil {
 		return err
@@ -47,4 +50,34 @@ func (*Log) setup() error {
 		)
 		off, _ := strconv.ParseUint(offStr, 10, 0)
 	}
+	sort.Slice(baseOffsets, func(i, j int) bool {
+		return baseOffsets[i] < baseOffsets[j]
+	})
+	for i := 0; i < len(baseOffsets); i++ {
+		if err = l.newSegment(baseOffsets[i]); err != nil {
+			return err
+		}
+		// baseOffsets contains dup for index and store so we skip
+		// the dup
+		i++
+	}
+	if l.segments == nil {
+		if err = l.newSegment(l.Config.Segment.InitialOffset); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (l *Log) Append(record *api.Record) (uint64, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	off, err := l.activeSegment.Append(record)
+	if err != nil {
+		return 0, err
+	}
+	if l.activeSegment.isMaxed() {
+		err = l.newSegment(off + 1)
+	}
+	return off, err
 }
