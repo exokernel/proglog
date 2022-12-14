@@ -3,6 +3,7 @@ package log
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path"
 	"sort"
 	"strconv"
@@ -108,4 +109,34 @@ func (l *Log) Close() error {
 		}
 	}
 	return nil
+}
+
+func (l *Log) Remove() error {
+	if err := l.Close(); err != nil {
+		return err
+	}
+	return os.RemoveAll(l.Dir)
+}
+
+func (l *Log) Reset() error {
+	if err := l.Remove(); err != nil {
+		return err
+	}
+	return l.setup()
+}
+
+func (l *Log) LowestOffset() (uint64, error) {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return l.segments[0].baseOffset, nil
+}
+
+func (l *Log) HighestOffset() (uint64, error) {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	off := l.segments[len(l.segments)-1].nextOffset
+	if off == 0 {
+		return 0, nil
+	}
+	return off - 1, nil
 }
