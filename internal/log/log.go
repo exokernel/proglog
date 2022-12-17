@@ -20,11 +20,11 @@ type Log struct {
 	Dir    string
 	Config Config
 
-	activeSegment segment
+	activeSegment *segment
 	segments      []*segment
 }
 
-func newLog(dir string, c Config) (*Log, error) {
+func NewLog(dir string, c Config) (*Log, error) {
 	if c.Segment.MaxStoreBytes == 0 {
 		c.Segment.MaxStoreBytes = 1024
 	}
@@ -41,7 +41,7 @@ func newLog(dir string, c Config) (*Log, error) {
 }
 
 func (l *Log) setup() error {
-	files, err := ioutil.ReadAll(l.Dir)
+	files, err := ioutil.ReadDir(l.Dir)
 	if err != nil {
 		return err
 	}
@@ -52,6 +52,7 @@ func (l *Log) setup() error {
 			path.Ext(file.Name()),
 		)
 		off, _ := strconv.ParseUint(offStr, 10, 0)
+		baseOffsets = append(baseOffsets, off)
 	}
 	sort.Slice(baseOffsets, func(i, j int) bool {
 		return baseOffsets[i] < baseOffsets[j]
@@ -90,7 +91,7 @@ func (l *Log) Read(off uint64) (*api.Record, error) {
 	defer l.mu.RUnlock()
 	var s *segment
 	for _, segment := range l.segments {
-		if s.baseOffset <= off && off < s.nextOffset {
+		if segment.baseOffset <= off && off < segment.nextOffset {
 			s = segment
 			break
 		}
@@ -170,7 +171,7 @@ func (l *Log) Reader() io.Reader {
 }
 
 type originReader struct {
-	*store,
+	*store
 	off int64
 }
 
