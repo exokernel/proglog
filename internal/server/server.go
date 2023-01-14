@@ -4,6 +4,7 @@ import (
 	"context"
 
 	api "github.com/exokernel/proglog/api/v1"
+	"google.golang.org/grpc"
 )
 
 type Config struct {
@@ -12,12 +13,22 @@ type Config struct {
 
 var _ api.LogServer = (*grpcServer)(nil)
 
+func NewGRPCServer(config *Config) (*grpc.Server, error) {
+	gsrv := grpc.NewServer()
+	srv, err := newgrpcServer(config)
+	if err != nil {
+		return nil, err
+	}
+	api.RegisterLogServer(gsrv, srv)
+	return gsrv, nil
+}
+
 type grpcServer struct {
 	api.UnimplementedLogServer
 	*Config
 }
 
-func newgrpcServer(conifg *Config) (srv *grpcServer, err error) {
+func newgrpcServer(config *Config) (srv *grpcServer, err error) {
 	srv = &grpcServer{
 		Config: config,
 	}
@@ -76,4 +87,9 @@ func (s *grpcServer) ConsumeStream(req *api.ConsumeRequest, stream api.Log_Consu
 			req.Offset++
 		}
 	}
+}
+
+type CommitLog interface {
+	Append(*api.Record) (uint64, error)
+	Read(uint64) (*api.Record, error)
 }
