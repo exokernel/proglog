@@ -21,6 +21,7 @@ gencert:
 test:
 	go test -race ./...
 
+.PHONY: compile
 compile:
 	protoc api/v1/*.proto \
 				--go_out=. \
